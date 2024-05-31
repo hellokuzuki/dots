@@ -55,6 +55,19 @@ install_fzfgit() {
 	echo "fzf-git.sh installed and configured. You can now use it in your terminal."
 }
 
+install_bat() {
+	echo "bat not found. Installing bat"
+	sudo apt update
+	sudo apt install -y bat
+	mkdir -p ~/.local/bin
+	ln -s /usr/bin/batcat ~/.local/bin/bat
+	mkdir -p "$(bat --config-dir)/themes"
+	wget -P "$(bat --config-dir)/themes" https://github.com/catppuccin/bat/raw/main/themes/Catppuccin%20Macchiato.tmTheme
+	bat cache --build
+	BAT_THEME='export BAT_THEME="Catppuccin Macchiato"'
+	echo "$BAT_THEME" >>~/.zshrc
+}
+
 # Check if zsh is installed
 if ! command -v zsh &>/dev/null; then
 	install_zsh
@@ -83,7 +96,7 @@ else
 	install_fzf
 fi
 
-# Check if fd is installed
+# check if fd is installed
 if command -v fd >/dev/null 2>&1; then
 	echo "fd is already installed."
 else
@@ -97,25 +110,51 @@ else
 	install_fzfgit
 fi
 
-# -- Use fd instead of fzf --
-if [[ -z "${FZF_DEFAULT_COMMAND}" ]]; then
-	export FZF_DEFAULT_COMMAND="fd --hidden --strip-cwd-prefix --exclude .git"
+# check if bat is installed
+if command -v bat >/dev/null 2>&1; then
+	echo "bat is already installed."
+else
+	install_bat
+	echo "bat is installed."
 fi
 
-if [[ -z "${FZF_CTRL_T_COMMAND}" ]]; then
-	export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
-fi
+# Define the variables to be added
+variable_definitions=(
+	'export FZF_DEFAULT_COMMAND="fd --hidden --strip-cwd-prefix --exclude .git"'
+	'export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"'
+	'export FZF_ALT_C_COMMAND="fd --type=d --hidden --strip-cwd-prefix --exclude .git"'
+	'export FZF_DEFAULT_OPTS=" \
+          --color=bg+:#363a4f,bg:#24273a,spinner:#f4dbd6,hl:#ed8796 \
+          --color=fg:#cad3f5,header:#ed8796,info:#c6a0f6,pointer:#f4dbd6 \
+          --color=marker:#f4dbd6,fg+:#cad3f5,prompt:#c6a0f6,hl+:#ed8796"'
+)
 
-if [[ -z "${FZF_ALT_C_COMMAND}" ]]; then
-	export FZF_ALT_C_COMMAND="fd --type=d --hidden --strip-cwd-prefix --exclude .git"
-fi
+# Define the variables names to check
+variable_names=(
+	'FZF_DEFAULT_COMMAND'
+	'FZF_CTRL_T_COMMAND'
+	'FZF_ALT_C_COMMAND'
+	'FZF_DEFAULT_OPTS'
+)
 
-if [[ -z "${FZF_DEFAULT_OPTS}" ]]; then
-	export FZF_DEFAULT_OPTS=" \
---color=bg+:#363a4f,bg:#24273a,spinner:#f4dbd6,hl:#ed8796 \
---color=fg:#cad3f5,header:#ed8796,info:#c6a0f6,pointer:#f4dbd6 \
---color=marker:#f4dbd6,fg+:#cad3f5,prompt:#c6a0f6,hl+:#ed8796"
-fi
+# Function to check if a variable is defined in the .zshrc file
+is_defined_in_zshrc() {
+	local var_name="$1"
+	grep -q "export $var_name=" ~/.zshrc
+}
+
+# Iterate over the variables and add them if not defined
+for i in "${!variable_names[@]}"; do
+	var_name="${variable_names[$i]}"
+	var_definition="${variable_definitions[$i]}"
+
+	if ! is_defined_in_zshrc "$var_name"; then
+		echo "$var_definition" >>~/.zshrc
+		echo "Added: $var_definition"
+	else
+		echo "$var_name is already defined in ~/.zshrc"
+	fi
+done
 
 FUNCTIONS='
 _fzf_compgen_path() {
